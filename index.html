@@ -895,13 +895,13 @@ let schedCache = {key:null, url:null, canvas:null, busy:false};
 function schedBlock(){
   const d = fmtDate();
   let img = '';
-  if(ui.showSched){
+  if(ui.showSched && isAdmin()){
     const key = JSON.stringify([state.series, state.teams.map(t=>t.name), state.matches.map(m=>[m.home,m.away,m.ground,m.slot,m.time,m.ump])]);
     if(schedCache.key === key && schedCache.url) img = `<div class="post" style="max-width:420px"><img src="${schedCache.url}" alt="Schedule post"><div class="row"><button class="btn primary" data-act="save-sched">Save image</button><span class="small muted">or long-press the image</span></div></div>`;
     else { img = '<div class="empty">Designing the schedule post…</div>'; if(!schedCache.busy){ schedCache.busy = true; fontsReady().then(() => { indexPlayers(); const c = drawSchedule(); schedCache = {key, url:c.toDataURL('image/png'), canvas:c, busy:false}; render(); }).catch(() => schedCache.busy = false); } }
   }
   return `<section class="sec"><div class="sec-h"><h2>Schedule</h2><span class="small muted">${d ? esc(d) + ' · ' : ''}${esc(slotTime(S(),1))} start</span></div>
-    <div class="row"><button class="btn ${ui.showSched ? '' : 'tape'}" data-act="sched-post">${ui.showSched ? 'Hide schedule post' : 'Schedule post for WhatsApp'}</button></div>${img}</section>`;
+    ${isAdmin() ? `<div class="row"><button class="btn ${ui.showSched ? '' : 'tape'}" data-act="sched-post">${ui.showSched ? 'Hide schedule post' : 'Schedule post for WhatsApp'}</button></div>${img}` : ''}</section>`;
 }
 function drawSchedule(){
   const s = S(), G = s.grounds.length, byG = s.grounds.map((g,i) => state.matches.filter(m => m.ground === i && !m.trial).sort((a,b)=>a.slot-b.slot));
