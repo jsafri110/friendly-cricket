@@ -750,7 +750,7 @@ function authChip(){
 }
 
 function renderMain(){
-  const s = S(), tabs = [['matches','Matches'],['table','Points table'],['stats','Stats'],['teams','Teams'],['awards','Awards & posts']];
+  const s = S(), tabs = [['matches','Matches'],['table','Points table'],['stats','Stats'],['teams','Teams'],['awards', isAdmin() ? 'Awards & posts' : 'Awards']];
   if(isAdmin()) tabs.push(['setup','Setup']);
   if(!tabs.some(t => t[0] === ui.tab)) ui.tab = 'matches';
   let body;
@@ -961,7 +961,7 @@ function renderAwards(){
   const ms = standouts(state, true);
   const list = ms.length ? ms.map(x => `<div class="ms"><span class="badge ${MS_RANK[x.k] < 70 ? 'lo' : ''}">${MS_BADGE[x.k]}</span><span><b>${esc(pn(x.id))}</b> <span class="muted">${esc(tn(x.team))}</span><br><span class="small muted">${x.text} vs ${esc(tn(x.opp))} · Match ${x.match}</span></span></div>`).join('') : '<p class="small muted">Hat-tricks, fifties, hundreds, 3, 4 and 5 wicket hauls, 30+ scores and maidens will show up here.</p>';
   let posts = '';
-  if(complete || ui.previewPosts){
+  if(isAdmin() && (complete || ui.previewPosts)){
     const key = JSON.stringify([state.setupRev, state.matches.map(m => m.rev||0)]);
     if(postCache.key === key && postCache.posts){
       posts = `<div class="posts">${postCache.posts.map((p,i) => `<div class="post"><img src="${p.url}" alt="${esc(p.alt)}"><div class="row"><button class="btn primary" data-act="save-post" data-k="${i}">Save image</button><span class="small muted">or long-press the image</span></div></div>`).join('')}</div>`;
@@ -974,10 +974,11 @@ function renderAwards(){
   const summary = aw && aw.winner ? `<div class="card" style="display:flex;flex-direction:column;gap:6px"><div class="lbl">Series complete</div>
     <h2 style="font-size:40px;text-transform:uppercase">${esc(tn(aw.winner.id))} are champions</h2>
     <div class="small muted">Runners-up: ${esc(tn(aw.runner && aw.runner.id))}</div></div>` : '';
-  return `${summary}<section class="sec"><div class="sec-h"><h2>Image posts</h2><span class="small muted">${done} of ${total} matches played</span></div>
+  const postsSec = isAdmin() ? `<section class="sec"><div class="sec-h"><h2>Image posts</h2><span class="small muted">${done} of ${total} matches played</span></div>
     ${posts || `<div class="empty">The champions post, standout performances post and final standings post are designed here automatically as soon as the last match is finished.</div>`}
-    ${!complete && scoring() ? `<div class="row"><button class="btn" data-act="preview-posts">${ui.previewPosts ? 'Hide preview' : 'Preview posts with current numbers'}</button></div>` : ''}
-  </section>
+    ${!complete ? `<div class="row"><button class="btn" data-act="preview-posts">${ui.previewPosts ? 'Hide preview' : 'Preview posts with current numbers'}</button></div>` : ''}
+  </section>` : '';
+  return `${summary}${postsSec}
   <section class="sec"><div class="sec-h"><h2>Standout performances</h2><span class="small muted">Completed matches</span></div><div class="card">${list}</div></section>`;
 }
 
