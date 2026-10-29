@@ -1387,8 +1387,10 @@ function wicketSheet(m){
     <div class="pad" style="grid-template-columns:repeat(5,1fr)">${[0,1,2,3,4].map(n=>`<button class="k ${sh.r===n?'four':''}" data-act="wk-r" data-k="${n}" aria-pressed="${sh.r===n}">${n}</button>`).join('')}</div>
     <div class="lbl">The ball was</div><div class="opts">${[['','Legal ball'],['wd','Wide'],['nb','No ball']].map(([k,l]) => `<button class="opt ${sh.x===k?'on':''}" data-act="wk-x" data-k="${k}">${l}</button>`).join('')}</div>
     <p class="small muted" style="margin:0">${sh.r} run${sh.r===1?'':'s'}${sh.x === 'wd' ? ' + 1 wide' : sh.x === 'nb' ? ' + 1 no ball' : ''} will be added to the score, then ${esc(pn(sh.p))} is run out.</p>` : ''}
+  ${sh.k === 'stumped' ? `<div class="lbl">The ball was</div><div class="opts">${[['','Legal ball'],['wd','Wide']].map(([k,l]) => `<button class="opt ${sh.x===k?'on':''}" data-act="wk-x" data-k="${k}">${l}</button>`).join('')}</div>
+    <p class="small muted" style="margin:0">${sh.x === 'wd' ? 'Stumped off a wide: 1 wide is added and the wicket goes to the bowler. The ball does not count in the over.' : 'A batter cannot be stumped off a no ball.'}</p>` : ''}
   ${needsF ? `<div class="lbl">${sh.k === 'caught' ? 'Caught by' : sh.k === 'stumped' ? 'Keeper' : 'Fielder'}</div><div class="opts">${(m.xi[inn.bowl]||[]).map(id => `<button class="opt ${sh.f===id?'on':''}" data-act="wk-f" data-id="${id}">${esc(pn(id))}${id===inn.cur.bw ? ' <small>bowler</small>' : ''}</button>`).join('')}</div>` : ''}
-  <button class="btn tape" data-act="wk-ok" ${needsF && !sh.f && sh.k !== 'runout' ? 'disabled' : ''}>${sh.k === 'runout' && (sh.r || sh.x) ? `Confirm run out + ${sh.r + (sh.x ? 1 : 0)} run${sh.r + (sh.x ? 1 : 0) === 1 ? '' : 's'}` : 'Confirm wicket'}</button>`;
+  <button class="btn tape" data-act="wk-ok" ${needsF && !sh.f && sh.k !== 'runout' ? 'disabled' : ''}>${sh.k === 'stumped' && sh.x === 'wd' ? 'Confirm stumped off a wide' : sh.k === 'runout' && (sh.r || sh.x) ? `Confirm run out + ${sh.r + (sh.x ? 1 : 0)} run${sh.r + (sh.x ? 1 : 0) === 1 ? '' : 's'}` : 'Confirm wicket'}</button>`;
 }
 
 // ---------- actions ----------
@@ -1528,7 +1530,7 @@ const ACT = {
   run(el){ ball({r: +el.dataset.k}); },
   sheet(el){ ui.sheet = {type: el.dataset.k}; render(); },
   extra(el){ const x = el.dataset.x, n = +el.dataset.k; ball(x === 'nb' ? {x, r:n} : {x, e:n}); },
-  'wk-k'(el){ ui.sheet.k = el.dataset.k; const m = curMatch(); if(el.dataset.k !== 'runout'){ ui.sheet.p = m.innings[m.innings.length-1].cur.st; ui.sheet.r = 0; ui.sheet.x = ''; } renderSheet(); },
+  'wk-k'(el){ ui.sheet.k = el.dataset.k; const m = curMatch(); if(el.dataset.k !== 'runout'){ ui.sheet.p = m.innings[m.innings.length-1].cur.st; ui.sheet.r = 0; } if(el.dataset.k !== 'runout' && el.dataset.k !== 'stumped') ui.sheet.x = ''; if(el.dataset.k === 'stumped' && ui.sheet.x === 'nb') ui.sheet.x = ''; renderSheet(); },
   'wk-p'(el){ ui.sheet.p = el.dataset.id; renderSheet(); },
   'wk-r'(el){ ui.sheet.r = +el.dataset.k; renderSheet(); },
   'wk-f'(el){ ui.sheet.f = el.dataset.id; renderSheet(); },
@@ -1536,6 +1538,7 @@ const ACT = {
     const sh = ui.sheet, f = ['caught','runout','stumped'].includes(sh.k) ? (sh.f || null) : null, w = {k: sh.k, p: sh.p, f};
     if(sh.k === 'runout' && sh.x === 'wd') ball({x:'wd', e: sh.r, w});
     else if(sh.k === 'runout' && sh.x === 'nb') ball({x:'nb', r: sh.r, w});
+    else if(sh.k === 'stumped' && sh.x === 'wd') ball({x:'wd', e: 0, w});
     else ball({r: sh.k === 'runout' ? sh.r : 0, w});
   },
   'wk-x'(el){ ui.sheet.x = el.dataset.k; renderSheet(); },
