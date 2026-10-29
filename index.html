@@ -203,6 +203,12 @@ tr.top1 td{background:color-mix(in srgb, var(--tape) 14%, transparent)}
   background:radial-gradient(circle at 35% 30%, color-mix(in srgb, var(--tape) 55%, #fff), var(--tape) 55%, color-mix(in srgb, var(--tape) 70%, #000)); box-shadow:inset 0 0 0 5px color-mix(in srgb, var(--tape) 70%, #000)}
 .coin.spin{animation:coinflip 1.4s cubic-bezier(.25,.6,.3,1) both}
 @keyframes coinflip{0%{transform:translateY(0) rotateX(0)} 45%{transform:translateY(-70px) rotateX(1080deg)} 100%{transform:translateY(0) rotateX(1800deg)}}
+
+button.bat{font:inherit; color:inherit; text-align:left; cursor:pointer; width:100%; touch-action:manipulation}
+button.bat:disabled{cursor:default; opacity:1}
+button.bat:not(:disabled):active{transform:translateY(1px)}
+.swap-hint{font-size:11px; font-weight:600; color:var(--muted); margin-top:2px}
+.k.swapk{background:color-mix(in srgb, var(--tape) 22%, var(--surface)); border-color:color-mix(in srgb, var(--tape) 60%, var(--line))}
 @media (max-width:420px){ .top h1{font-size:34px} .board .big{font-size:56px} .k{height:58px} }
 @media (prefers-reduced-motion: reduce){ *{transition:none!important; animation:none!important} }
 </style>
@@ -690,7 +696,7 @@ function resultText(m){
 }
 function chip(b){
   const s = S();
-  if(b.w) return `<span class="b w">W</span>`;
+  if(b.w){ const t = ballTotal(b, s); return `<span class="b w">${t ? t + 'W' : 'W'}</span>`; }
   if(b.x === 'wd') return `<span class="b x">${s.wideRuns + (b.e||0)}wd</span>`;
   if(b.x === 'nb') return `<span class="b x">nb${b.r ? '+'+b.r : ''}</span>`;
   if(b.x === 'b' || b.x === 'lb') return `<span class="b x">${b.e}${b.x}</span>`;
@@ -1247,7 +1253,7 @@ function renderPad(m){
   let eq = `CRR ${st.legal ? (st.runs/(st.legal/s.bpo)).toFixed(2) : '0.00'}`;
   if(i === 1){ const need = target(m, s) - st.runs; eq = `Need ${need} off ${left} ball${left===1?'':'s'} · RRR ${left ? (need/(left/s.bpo)).toFixed(2) : '–'}`; }
   else eq += ` · ${left} balls left`;
-  const bat = (id, on) => { if(!id){ const alone = st.w >= m.xi[inn.bat].length-1; return `<div class="bat"><div class="n muted">${alone ? 'Runner' : 'New batter'}</div><div class="s"><small>${alone ? 'never takes strike' : '–'}</small></div></div>`; } const x = st.bat[id] || {r:0,b:0}; return `<div class="bat ${on?'on':''}"><div class="n">${on ? '● ' : ''}${esc(pn(id))}</div><div class="s">${x.r} <small>(${x.b})</small></div></div>`; };
+  const bat = (id, on) => { if(!id){ const alone = st.w >= m.xi[inn.bat].length-1; return `<div class="bat"><div class="n muted">${alone ? 'Runner' : 'New batter'}</div><div class="s"><small>${alone ? 'never takes strike' : '–'}</small></div></div>`; } const x = st.bat[id] || {r:0,b:0}, canSwap = !!(cur.st && cur.ns); return `<button class="bat ${on?'on':''}" ${canSwap ? 'data-act="swap"' : 'disabled'} aria-label="${esc(pn(id))}${on ? ', on strike' : ''}${canSwap ? '. Tap to swap strike' : ''}"><div class="n">${on ? '● ' : ''}${esc(pn(id))}</div><div class="s">${x.r} <small>(${x.b})</small></div>${canSwap && !on ? '<div class="swap-hint">Tap to give strike</div>' : ''}</button>`; };
   const bw = cur.bw && st.bowl[cur.bw];
   const curOver = Math.floor(st.legal / s.bpo), ov = st.overs[curOver] && cur.bw ? st.overs[curOver] : null;
   const last = st.overs.filter(Boolean).slice(-1)[0];
@@ -1261,7 +1267,7 @@ function renderPad(m){
     <button class="k" data-act="run" data-k="0">0</button><button class="k" data-act="run" data-k="1">1</button><button class="k" data-act="run" data-k="2">2</button><button class="k" data-act="run" data-k="3">3</button>
     <button class="k four" data-act="run" data-k="4">4</button><button class="k six" data-act="run" data-k="6">6</button><button class="k sm" data-act="sheet" data-k="wd">Wide</button><button class="k sm" data-act="sheet" data-k="nb">No ball</button>
     <button class="k sm" data-act="sheet" data-k="b">Bye</button><button class="k sm" data-act="sheet" data-k="lb">Leg bye</button><button class="k wk" data-act="sheet" data-k="wicket">WICKET</button>
-    <button class="k sm util" data-act="undo">Undo</button><button class="k sm util" data-act="swap" ${cur.ns ? '' : 'disabled'}>Swap strike</button><button class="k sm util" data-act="sheet" data-k="change-bowler">Change bowler</button><button class="k sm util" data-act="open" data-id="${m.id}" data-from="score">Scorecard</button>
+    <button class="k sm util" data-act="undo">Undo</button><button class="k sm swapk" data-act="swap" ${cur.ns ? '' : 'disabled'}>⇄ Swap strike</button><button class="k sm util" data-act="sheet" data-k="change-bowler">Change bowler</button><button class="k sm util" data-act="open" data-id="${m.id}" data-from="score">Scorecard</button>
   </div></div>
   <button class="btn" data-act="sheet" data-k="sub">Impact sub</button>${subsNote(m)}`;
 }
@@ -1372,14 +1378,17 @@ function renderSheet(){
 }
 function wicketSheet(m){
   const inn = m.innings[m.innings.length-1], sh = ui.sheet;
-  sh.k = sh.k || 'bowled'; sh.p = sh.p || inn.cur.st; sh.r = sh.r || 0;
+  sh.k = sh.k || 'bowled'; sh.p = sh.p || inn.cur.st; sh.r = sh.r || 0; sh.x = sh.x || '';
   const kinds = ['bowled','caught','outofbox','runout','stumped','lbw','hitwicket'];
   const needsF = ['caught','runout','stumped'].includes(sh.k);
   return `<div class="lbl">How out</div><div class="opts">${kinds.map(k => `<button class="opt ${sh.k===k?'on':''}" data-act="wk-k" data-k="${k}">${KIND_LABEL[k]}</button>`).join('')}</div>
   ${sh.k === 'runout' ? `<div class="lbl">Who is out</div><div class="opts">${[inn.cur.st, inn.cur.ns].filter(Boolean).map(id => `<button class="opt ${sh.p===id?'on':''}" data-act="wk-p" data-id="${id}">${esc(pn(id))}</button>`).join('')}</div>
-    <div class="lbl">Runs completed before the run out</div><div class="opts">${[0,1,2,3].map(n=>`<button class="opt ${sh.r===n?'on':''}" data-act="wk-r" data-k="${n}">${n}</button>`).join('')}</div>` : ''}
+    <div class="lbl">Runs completed before the run out</div>
+    <div class="pad" style="grid-template-columns:repeat(5,1fr)">${[0,1,2,3,4].map(n=>`<button class="k ${sh.r===n?'four':''}" data-act="wk-r" data-k="${n}" aria-pressed="${sh.r===n}">${n}</button>`).join('')}</div>
+    <div class="lbl">The ball was</div><div class="opts">${[['','Legal ball'],['wd','Wide'],['nb','No ball']].map(([k,l]) => `<button class="opt ${sh.x===k?'on':''}" data-act="wk-x" data-k="${k}">${l}</button>`).join('')}</div>
+    <p class="small muted" style="margin:0">${sh.r} run${sh.r===1?'':'s'}${sh.x === 'wd' ? ' + 1 wide' : sh.x === 'nb' ? ' + 1 no ball' : ''} will be added to the score, then ${esc(pn(sh.p))} is run out.</p>` : ''}
   ${needsF ? `<div class="lbl">${sh.k === 'caught' ? 'Caught by' : sh.k === 'stumped' ? 'Keeper' : 'Fielder'}</div><div class="opts">${(m.xi[inn.bowl]||[]).map(id => `<button class="opt ${sh.f===id?'on':''}" data-act="wk-f" data-id="${id}">${esc(pn(id))}${id===inn.cur.bw ? ' <small>bowler</small>' : ''}</button>`).join('')}</div>` : ''}
-  <button class="btn tape" data-act="wk-ok" ${needsF && !sh.f && sh.k !== 'runout' ? 'disabled' : ''}>Confirm wicket</button>`;
+  <button class="btn tape" data-act="wk-ok" ${needsF && !sh.f && sh.k !== 'runout' ? 'disabled' : ''}>${sh.k === 'runout' && (sh.r || sh.x) ? `Confirm run out + ${sh.r + (sh.x ? 1 : 0)} run${sh.r + (sh.x ? 1 : 0) === 1 ? '' : 's'}` : 'Confirm wicket'}</button>`;
 }
 
 // ---------- actions ----------
@@ -1519,11 +1528,17 @@ const ACT = {
   run(el){ ball({r: +el.dataset.k}); },
   sheet(el){ ui.sheet = {type: el.dataset.k}; render(); },
   extra(el){ const x = el.dataset.x, n = +el.dataset.k; ball(x === 'nb' ? {x, r:n} : {x, e:n}); },
-  'wk-k'(el){ ui.sheet.k = el.dataset.k; const m = curMatch(); if(el.dataset.k !== 'runout') ui.sheet.p = m.innings[m.innings.length-1].cur.st; renderSheet(); },
+  'wk-k'(el){ ui.sheet.k = el.dataset.k; const m = curMatch(); if(el.dataset.k !== 'runout'){ ui.sheet.p = m.innings[m.innings.length-1].cur.st; ui.sheet.r = 0; ui.sheet.x = ''; } renderSheet(); },
   'wk-p'(el){ ui.sheet.p = el.dataset.id; renderSheet(); },
   'wk-r'(el){ ui.sheet.r = +el.dataset.k; renderSheet(); },
   'wk-f'(el){ ui.sheet.f = el.dataset.id; renderSheet(); },
-  'wk-ok'(){ const sh = ui.sheet, f = ['caught','runout','stumped'].includes(sh.k) ? (sh.f || null) : null; ball({r: sh.k === 'runout' ? sh.r : 0, w:{k: sh.k, p: sh.p, f}}); },
+  'wk-ok'(){
+    const sh = ui.sheet, f = ['caught','runout','stumped'].includes(sh.k) ? (sh.f || null) : null, w = {k: sh.k, p: sh.p, f};
+    if(sh.k === 'runout' && sh.x === 'wd') ball({x:'wd', e: sh.r, w});
+    else if(sh.k === 'runout' && sh.x === 'nb') ball({x:'nb', r: sh.r, w});
+    else ball({r: sh.k === 'runout' ? sh.r : 0, w});
+  },
+  'wk-x'(el){ ui.sheet.x = el.dataset.k; renderSheet(); },
   'new-bat'(el){
     const m = curMatch(), inn = m.innings[m.innings.length-1], other = inn.cur.st || inn.cur.ns, strike = !!(ui.sheet && ui.sheet.strike);
     inn.cur = Object.assign({}, inn.cur, strike || !other ? {st: el.dataset.id, ns: other || null} : {st: other, ns: el.dataset.id});
@@ -1532,7 +1547,7 @@ const ACT = {
   strike(el){ ui.sheet.strike = el.checked; },
   'all-bowlers'(el){ ui.showAllBowlers = el.checked; renderSheet(); },
   'set-bowler'(el){ const m = curMatch(), inn = m.innings[m.innings.length-1]; inn.cur = Object.assign({}, inn.cur, {bw: el.dataset.id}); ui.sheet = null; ui.showAllBowlers = false; touchMatch(m); },
-  swap(){ const m = curMatch(), inn = m.innings[m.innings.length-1]; if(!inn.cur.ns) return; inn.cur = Object.assign({}, inn.cur, {st: inn.cur.ns, ns: inn.cur.st}); touchMatch(m); },
+  swap(){ const m = curMatch(), inn = m.innings[m.innings.length-1]; if(!inn.cur.ns || !inn.cur.st) return; inn.cur = Object.assign({}, inn.cur, {st: inn.cur.ns, ns: inn.cur.st}); touchMatch(m); toast(`${pn(inn.cur.st)} on strike`); },
   undo(){ const m = curMatch(); if(!m) return; ui.sheet = null; ui.draft = null; if(undoBall(m)) touchMatch(m); else render(); },
   so(el){ ui.draft.so = el.dataset.t || null; render(); },
   mom(el){ ui.draft.mom = el.dataset.id; render(); },
