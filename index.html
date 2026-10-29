@@ -1347,6 +1347,8 @@ function renderSheet(){
     h = auth.role === 'admin' ? 'Organiser' : `${tn(auth.team)} scorer`;
     body = `<p class="small" style="margin:0">${auth.role === 'admin' ? 'You can score every match and change the series setup.' : 'You can score any match. Matches still to finish:'}</p>
       ${auth.role === 'admin' ? '' : `<div class="opts">${mine.map(m => `<button class="opt" data-act="open" data-id="${m.id}">Match ${m.no} · ${esc(matchTime(m))} · ${esc(tn(m.home))} v ${esc(tn(m.away))}</button>`).join('') || '<span class="small muted">No more matches to umpire.</span>'}</div>`}`;
+    const nTrials = state.matches.filter(m => m.trial && m.createdBy === auth.team).length;
+    if(nTrials) body += `<p class="small muted" style="margin:0">Logging out deletes your ${nTrials} practice match${nTrials === 1 ? '' : 'es'}.</p>`;
     foot = `<button class="btn danger" data-act="logout">Log out</button><button class="btn" data-act="close">Close</button>`;
   }
   else if(sh.type === 'sub'){
@@ -1419,7 +1421,12 @@ const ACT = {
     } catch(e){ ui.sheet.err = 'Could not reach the server. Check your connection.'; }
     ui.sheet.busy = false; renderSheet();
   },
-  logout(){ ui.sheet = null; logout(); toast('Logged out'); },
+  async logout(){
+    ui.sheet = null;
+    const mine = state.matches.filter(m => m.trial && m.createdBy === auth.team).map(m => m.id);
+    for(const id of mine) await deleteMatch(id);
+    logout(); toast(mine.length ? `Logged out. ${mine.length} practice match${mine.length === 1 ? '' : 'es'} deleted.` : 'Logged out');
+  },
   'stats-team'(el){ ui.statsTeam = el.dataset.t; render(); },
   async 'set-pin'(el){
     const t = el.dataset.t, inp = document.getElementById('pin-' + t), v = (inp.value || '').trim();
@@ -1475,7 +1482,7 @@ const ACT = {
   'trial-team'(el){ ui.sheet[el.dataset.k] = el.dataset.t; renderSheet(); },
   'create-trial'(){
     const {a, b} = ui.sheet; if(!a || !b || a === b) return;
-    const m = {id: uid('x'), trial:true, no:0, slot:0, ground:0, home:a, away:b, status:'upcoming', innings:[], rev:0};
+    const m = {id: uid('x'), trial:true, createdBy: auth && auth.team, no:0, slot:0, ground:0, home:a, away:b, status:'upcoming', innings:[], rev:0};
     state.matches.push(m); ui.sheet = null; ui.score = m.id; ui.match = null; ui.draft = null; touchMatch(m);
   },
   reump(){ assignUmpires(state.matches.filter(m => !m.trial), state.teams.map(t => t.id)); touchSetup(); toast('Umpires reassigned'); },
